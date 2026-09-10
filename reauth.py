@@ -57,9 +57,13 @@ def main() -> int:
         login_hint=LOGIN_HINT,
     )
 
-    os.makedirs(os.path.dirname(TOKEN_PATH), exist_ok=True)
-    with open(TOKEN_PATH, "w") as f:
+    # Verzeichnis und Datei von Anfang an eng: der Refresh-Token darf nie,
+    # auch nicht kurz, mit Standardrechten auf der Platte liegen.
+    os.makedirs(os.path.dirname(TOKEN_PATH), mode=0o700, exist_ok=True)
+    fd = os.open(TOKEN_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         f.write(creds.to_json())
+    # O_CREAT setzt den Modus nur bei Neuanlage — eine zu offene Altdatei nachziehen.
     os.chmod(TOKEN_PATH, 0o600)
     print(f"New token saved to {TOKEN_PATH}")
     print("Restart Claude Code (or reload the google-ads MCP) to pick it up.")
