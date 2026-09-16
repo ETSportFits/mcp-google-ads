@@ -8,6 +8,13 @@ the same path the MCP server reads from.
 Run:
     source .venv/bin/activate
     python reauth.py
+
+Erstes Setup auf einem Rechner ohne Token-Datei: client_id und client_secret
+des Desktop-OAuth-Clients kommen dann aus der Umgebung, und der Google-Account,
+fuer den autorisiert wird, aus GOOGLE_ADS_LOGIN_HINT.
+
+    GOOGLE_ADS_CLIENT_ID=... GOOGLE_ADS_CLIENT_SECRET=... \
+    GOOGLE_ADS_LOGIN_HINT=vorname.nachname@sportfits.de python reauth.py
 """
 import json
 import os
@@ -20,21 +27,29 @@ TOKEN_PATH = os.environ.get(
     "GOOGLE_ADS_CREDENTIALS_PATH",
     os.path.expanduser("~/.config/google-ads-mcp/google_ads_token.json"),
 )
-LOGIN_HINT = "thorsten.eder@sportfits.de"
+LOGIN_HINT = os.environ.get("GOOGLE_ADS_LOGIN_HINT", "thorsten.eder@sportfits.de")
 
 
 def main() -> int:
-    if not os.path.exists(TOKEN_PATH):
-        print(f"Token file not found: {TOKEN_PATH}", file=sys.stderr)
-        return 1
-
-    with open(TOKEN_PATH) as f:
-        old = json.load(f)
+    # Ohne Token-Datei ist das ein Erstsetup: dann muessen die Client-Daten
+    # aus der Umgebung kommen. Frueher brach das Skript hier ab, womit der
+    # ENV-Fallback unten nie erreichbar war.
+    old = {}
+    if os.path.exists(TOKEN_PATH):
+        with open(TOKEN_PATH) as f:
+            old = json.load(f)
+    else:
+        print(f"Keine Token-Datei unter {TOKEN_PATH} — Erstsetup aus der Umgebung.")
 
     client_id = old.get("client_id") or os.environ.get("GOOGLE_ADS_CLIENT_ID")
     client_secret = old.get("client_secret") or os.environ.get("GOOGLE_ADS_CLIENT_SECRET")
     if not client_id or not client_secret:
-        print("client_id/client_secret not available in token file or env.", file=sys.stderr)
+        print(
+            "client_id/client_secret fehlen. Entweder eine bestehende Token-Datei "
+            "unter GOOGLE_ADS_CREDENTIALS_PATH, oder GOOGLE_ADS_CLIENT_ID und "
+            "GOOGLE_ADS_CLIENT_SECRET setzen.",
+            file=sys.stderr,
+        )
         return 1
 
     client_config = {
